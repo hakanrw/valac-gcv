@@ -270,6 +270,7 @@ public class Vala.GirParser : CodeVisitor {
 		private Scanner scanner;
 		private SourceLocation begin;
 		private SourceLocation end;
+		private Vala.Backend.Location loc;
 		private SourceLocation old_end;
 		private TokenType current;
 		private Metadata parent_metadata;
@@ -279,7 +280,7 @@ public class Vala.GirParser : CodeVisitor {
 		}
 
 		SourceReference get_current_src () {
-			return new SourceReference (scanner.source_file, begin, end);
+			return new SourceReference (scanner.source_file, begin, end, loc);
 		}
 
 		SourceReference get_src (SourceLocation begin, SourceLocation? end = null) {
@@ -287,7 +288,7 @@ public class Vala.GirParser : CodeVisitor {
 			if (end != null) {
 				e = end;
 			}
-			return new SourceReference (scanner.source_file, begin, e);
+			return new SourceReference (scanner.source_file, begin, e, loc);
 		}
 
 		public Metadata parse_metadata (SourceFile metadata_file) {
@@ -303,7 +304,8 @@ public class Vala.GirParser : CodeVisitor {
 
 		TokenType next () {
 			old_end = end;
-			current = scanner.read_token (out begin, out end);
+			Vala.Backend.Location loc;
+			current = scanner.read_token (out begin, out end, out loc);
 			return current;
 		}
 
@@ -1379,6 +1381,7 @@ public class Vala.GirParser : CodeVisitor {
 
 	SourceLocation begin;
 	SourceLocation end;
+	Vala.Backend.Location loc;
 	MarkupTokenType current_token;
 
 	string[] cheader_filenames;
@@ -1511,7 +1514,7 @@ public class Vala.GirParser : CodeVisitor {
 	}
 
 	void next () {
-		current_token = reader.read_token (out begin, out end);
+		current_token = reader.read_token (out begin, out end /*, out loc */); // FIXME: we need to read backend loc
 	}
 
 	void start_element (string name) {
@@ -1530,7 +1533,7 @@ public class Vala.GirParser : CodeVisitor {
 	}
 
 	SourceReference get_current_src () {
-		return new SourceReference (this.current_source_file, begin, end);
+		return new SourceReference (this.current_source_file, begin, end, loc);
 	}
 
 	SourceReference get_src (SourceLocation begin, SourceLocation? end = null) {
@@ -1538,7 +1541,7 @@ public class Vala.GirParser : CodeVisitor {
 		if (end != null) {
 			e = end;
 		}
-		return new SourceReference (this.current_source_file, begin, e);
+		return new SourceReference (this.current_source_file, begin, e, loc);
 	}
 
 	const string GIR_VERSION = "1.2";

@@ -22,12 +22,14 @@
  */
 
 using GLib;
+using Vala.Backend;
 
 /**
  * Lexical scanner for Genie source files.
  */
 public class Vala.Genie.Scanner {
 	public SourceFile source_file { get; private set; }
+	Linemap linemap;
 
 	public int indent_spaces { get; set;}
 
@@ -91,7 +93,7 @@ public class Vala.Genie.Scanner {
 
 		parse_started = false;
 		last_token = TokenType.NONE;
-
+		linemap = get_linemap ();
 	}
 
 	inline bool in_template () {
@@ -115,7 +117,11 @@ public class Vala.Genie.Scanner {
 	}
 
 	SourceReference get_source_reference (int offset, int length = 0) {
-		return new SourceReference (source_file, SourceLocation (current, line, column + offset), SourceLocation (current + length, line, column + offset + length));
+		return new SourceReference (source_file, SourceLocation (current, line, column + offset), SourceLocation (current + length, line, column + offset + length), get_backend_location_rel (offset, length));
+	}
+
+	Location get_backend_location_rel (int offset, uint length = 0) {
+		return linemap.get_location (column + offset - 1, length);
 	}
 
 	public TokenType read_regex_token (out SourceLocation token_begin, out SourceLocation token_end) {

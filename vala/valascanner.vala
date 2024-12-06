@@ -22,12 +22,14 @@
  */
 
 using GLib;
+using Vala.Backend;
 
 /**
  * Lexical scanner for Vala source files.
  */
 public class Vala.Scanner {
 	public SourceFile source_file { get; private set; }
+	Linemap linemap;
 
 	TokenType previous;
 	char* current;
@@ -47,7 +49,7 @@ public class Vala.Scanner {
 	}
 
 	State[] state_stack;
-
+	
 	enum State {
 		PARENS,
 		BRACE,
@@ -68,6 +70,9 @@ public class Vala.Scanner {
 
 		line = 1;
 		column = 1;
+
+		linemap = get_linemap ();
+		linemap.start_file (this.source_file.filename, line);
 	}
 
 	public void seek (SourceLocation location) {
@@ -100,10 +105,25 @@ public class Vala.Scanner {
 	}
 
 	SourceReference get_source_reference (int offset, int length = 0) {
-		return new SourceReference (source_file, SourceLocation (current, line, column + offset), SourceLocation (current + length, line, column + offset + length));
+		return new SourceReference (source_file, SourceLocation (current, line, column + offset), SourceLocation (current + length, line, column + offset + length), get_backend_location_rel (offset, length));
 	}
 
-	public TokenType read_regex_token (out SourceLocation token_begin, out SourceLocation token_end) {
+	/* FIXME: This is not ideal, and limits error information for lines to 80 chars.
+	   However, changing the current logic of the lexer is no trivial task. 
+	   If you are too ambitious, please change the logic here so that the lexer first 
+	   calls linemap.start_line (line_number, actual_line_width) by grabbing the line
+	   length first; before parsing tokens.  */
+	static int max_line_width_hint = 80;
+	
+	Location get_backend_location (int colnum, uint length = 0) {
+		return linemap.get_location (colnum, length);
+	}
+
+	Location get_backend_location_rel (int offset, uint length = 0) {
+		return linemap.get_location (column + offset, length);
+	}
+
+	public TokenType read_regex_token (out SourceLocation token_begin, out SourceLocation token_end, out Location backend_location) {
 		TokenType type;
 		char* begin = current;
 		token_begin = SourceLocation (begin, line, column);
@@ -293,7 +313,7 @@ public class Vala.Scanner {
 				if (current >= end || current[0] == '\n') {
 					Report.error (get_source_reference (token_length_in_chars), "syntax error, expected \"");
 					state_stack.length--;
-					return read_token (out token_begin, out token_end);
+					return read_token (out token_begin, out token_end, out backend_location);
 				}
 				break;
 			}
@@ -306,6 +326,7 @@ public class Vala.Scanner {
 		}
 
 		token_end = SourceLocation (current, line, column - 1);
+                backend_location = get_backend_location (token_begin.column, token_length_in_chars + 1);
 
 		return type;
 	}
@@ -739,7 +760,7 @@ public class Vala.Scanner {
 		return type;
 	}
 
-	public TokenType read_template_token (out SourceLocation token_begin, out SourceLocation token_end) {
+	public TokenType read_template_token (out SourceLocation token_begin, out SourceLocation token_end, out Location backend_location) {
 		bool is_verbatim = in_verbatim_template ();
 		TokenType type;
 		char* begin = current;
@@ -784,14 +805,14 @@ public class Vala.Scanner {
 					current++;
 					column += 2;
 					state_stack += State.PARENS;
-					return read_token (out token_begin, out token_end);
+					return read_token (out token_begin, out token_end, out backend_location);
 				} else if (current[0] == '$') {
 					type = is_verbatim ? TokenType.VERBATIM_TEMPLATE_STRING_LITERAL : TokenType.TEMPLATE_STRING_LITERAL;
 					current++;
 					state_stack += State.TEMPLATE_PART;
 				} else {
 					Report.error (get_source_reference (1), "unexpected character");
-					return read_template_token (out token_begin, out token_end);
+					return read_template_token (out token_begin, out token_end, out backend_location);
 				}
 				break;
 			default:
@@ -862,6 +883,7 @@ public class Vala.Scanner {
 					} else if (current[0] == '\n') {
 						current++;
 						line++;
+						linemap.start_line (line, max_line_width_hint);
 						column = 1;
 						token_length_in_chars = 1;
 					} else {
@@ -878,7 +900,7 @@ public class Vala.Scanner {
 				if (current >= end) {
 					Report.error (get_source_reference (token_length_in_chars), "syntax error, expected \"");
 					state_stack.length--;
-					return read_token (out token_begin, out token_end);
+					return read_token (out token_begin, out token_end, out backend_location);
 				}
 				state_stack += State.TEMPLATE_PART;
 				break;
@@ -892,22 +914,24 @@ public class Vala.Scanner {
 		}
 
 		token_end = SourceLocation (current, line, column - 1);
+                backend_location = get_backend_location (token_begin.column, token_length_in_chars + 1);
 
 		return type;
 	}
 
-	public TokenType read_token (out SourceLocation token_begin, out SourceLocation token_end) {
+	public TokenType read_token (out SourceLocation token_begin, out SourceLocation token_end, out Location backend_location) {
 		if (in_template () || in_verbatim_template ()) {
-			return read_template_token (out token_begin, out token_end);
+			return read_template_token (out token_begin, out token_end, out backend_location);
 		} else if (in_template_part ()) {
 			state_stack.length--;
 
 			token_begin = SourceLocation (current, line, column);
 			token_end = SourceLocation (current, line, column - 1);
+			backend_location = get_backend_location (token_begin.column);
 
 			return TokenType.COMMA;
 		} else if (in_regex_literal ()) {
-			return read_regex_token (out token_begin, out token_end);
+			return read_regex_token (out token_begin, out token_end, out backend_location);
 		}
 
 		space ();
@@ -1224,6 +1248,7 @@ public class Vala.Scanner {
 						} else if (current[0] == '\n') {
 							current++;
 							line++;
+							linemap.start_line (line, max_line_width_hint);
 							column = 1;
 							token_length_in_chars = 3;
 						} else {
@@ -1313,6 +1338,7 @@ public class Vala.Scanner {
 					} else if (current[0] == '\n') {
 						current++;
 						line++;
+						linemap.start_line (line, max_line_width_hint);
 						column = 1;
 						token_length_in_chars = 1;
 					} else {
@@ -1346,7 +1372,7 @@ public class Vala.Scanner {
 					Report.error (get_source_reference (0), "invalid UTF-8 character");
 				}
 				column++;
-				return read_token (out token_begin, out token_end);
+				return read_token (out token_begin, out token_end, out backend_location);
 			}
 		}
 
@@ -1357,6 +1383,7 @@ public class Vala.Scanner {
 		}
 
 		token_end = SourceLocation (current, line, column - 1);
+		backend_location = get_backend_location (token_begin.column, token_length_in_chars == -1 ? 0 : token_length_in_chars);
 		previous = type;
 
 		return type;
@@ -1437,6 +1464,7 @@ public class Vala.Scanner {
 				}
 				if (current[0] == '\n') {
 					line++;
+					linemap.start_line (line, max_line_width_hint);
 					column = 0;
 					bol = true;
 				} else if (!current[0].isspace ()) {
@@ -1646,6 +1674,7 @@ public class Vala.Scanner {
 		while (current < end && current[0].isspace ()) {
 			if (current[0] == '\n') {
 				line++;
+				linemap.start_line (line, max_line_width_hint);
 				column = 0;
 				bol = true;
 			}
@@ -1705,6 +1734,7 @@ public class Vala.Scanner {
 			       && (current[0] != '*' || current[1] != '/')) {
 				if (current[0] == '\n') {
 					line++;
+					linemap.start_line (line, max_line_width_hint);
 					column = 0;
 				}
 				current++;

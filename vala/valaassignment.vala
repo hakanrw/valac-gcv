@@ -66,9 +66,9 @@ public class Vala.Assignment : Expression {
 	 * @param source_reference reference to source code
 	 * @return                 newly created assignment
 	 */
-	public Assignment (Expression left, Expression right, AssignmentOperator operator = AssignmentOperator.SIMPLE, SourceReference? source_reference = null) {
+	public Assignment (Expression left, Expression right, AssignmentOperator oper = AssignmentOperator.SIMPLE, SourceReference? source_reference = null) {
 		this.right = right;
-		this.operator = operator;
+		this.operator = oper;
 		this.source_reference = source_reference;
 		this.left = left;
 	}

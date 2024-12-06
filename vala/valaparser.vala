@@ -36,6 +36,8 @@ public class Vala.Parser : CodeVisitor {
 	int index;
 	// number of tokens in buffer
 	int size;
+	// index of the first token of the last line
+	int last_line_token_index;
 
 	Comment comment;
 
@@ -50,6 +52,7 @@ public class Vala.Parser : CodeVisitor {
 		public TokenType type;
 		public SourceLocation begin;
 		public SourceLocation end;
+		public Vala.Backend.Location location;
 	}
 
 	struct PartialInfo {
@@ -104,13 +107,34 @@ public class Vala.Parser : CodeVisitor {
 	inline bool next () {
 		index = (index + 1) % BUFFER_SIZE;
 		size--;
+                bool eof;
+
 		if (size <= 0) {
 			SourceLocation begin, end;
-			TokenType type = scanner.read_token (out begin, out end);
-			tokens[index] = { type, begin, end };
+			Vala.Backend.Location location;
+			TokenType type = scanner.read_token (out begin, out end, out location);
+			tokens[index] = { type, begin, end, location };
 			size = 1;
+
+//			bool new_line = index > 0 && tokens[index - 1].begin.line != tokens[index].begin.line;
+//			eof = tokens[index].type == TokenType.EOF;
+//
+//			if (eof || new_line) {
+//				// Received new line, report previous line stack to backend.
+//				linemap.start_line (tokens[index - 1].begin.line);
+//
+//				for (int i = last_line_token_index; i < index; i++) {
+//					// Set backend locations of tokens.
+//				}
+//
+//				// The first token of the new line is assigned here.
+//				last_line_token_index = index;
+//			}
+
 		}
-		return (tokens[index].type != TokenType.EOF);
+
+		eof = tokens[index].type == TokenType.EOF;
+		return !eof;
 	}
 
 	inline void prev () {
@@ -177,6 +201,10 @@ public class Vala.Parser : CodeVisitor {
 		return tokens[index].begin;
 	}
 
+	inline Vala.Backend.Location get_backend_location () {
+		return tokens[index].location;
+	}
+
 	string get_location_string () {
 		var begin = get_location ();
 		return "__VALA_L%d_C%d__".printf (begin.line, begin.column);
@@ -196,18 +224,18 @@ public class Vala.Parser : CodeVisitor {
 	SourceReference get_src (SourceLocation begin) {
 		int last_index = (index + BUFFER_SIZE - 1) % BUFFER_SIZE;
 
-		return new SourceReference (scanner.source_file, begin, tokens[last_index].end);
+		return new SourceReference (scanner.source_file, begin, tokens[last_index].end, tokens[last_index].location);
 	}
 
 	SourceReference get_current_src () {
 		var token = tokens[index];
-		return new SourceReference (scanner.source_file, token.begin, token.end);
+		return new SourceReference (scanner.source_file, token.begin, token.end, token.location);
 	}
 
 	SourceReference get_last_src () {
 		int last_index = (index + BUFFER_SIZE - 1) % BUFFER_SIZE;
 		var token = tokens[last_index];
-		return new SourceReference (scanner.source_file, token.begin, token.end);
+		return new SourceReference (scanner.source_file, token.begin, token.end, token.location);
 	}
 
 	void rollback (SourceLocation location) {
@@ -414,6 +442,7 @@ public class Vala.Parser : CodeVisitor {
 		tokens = new TokenInfo[BUFFER_SIZE];
 		index = -1;
 		size = 0;
+		last_line_token_index = 0;
 
 		next ();
 
@@ -2652,7 +2681,7 @@ public class Vala.Parser : CodeVisitor {
 	void parse_main_block (Symbol parent) throws ParseError {
 		var begin = get_location ();
 
-		var method = new Method.main_block (new SourceReference (scanner.source_file, begin, begin));
+		var method = new Method.main_block (new SourceReference (scanner.source_file, begin, begin, get_backend_location ()));
 		method.access = SymbolAccessibility.PUBLIC;
 		method.binding = MemberBinding.STATIC;
 		method.body = new Block (get_src (begin));

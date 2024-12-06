@@ -570,13 +570,16 @@ public class Vala.CodeContext {
 		int api_major = 0;
 		int api_minor = 0;
 
+		stdout.printf("apiversion\n");
 		if (API_VERSION.scanf ("%d.%d", out api_major, out api_minor) != 2
 		    || api_major > 0
 		    || api_minor % 2 != 0) {
+			stdout.printf("invalid format\n");			
 			Report.error (null, "Invalid format for Vala.API_VERSION");
 			return;
 		}
 
+		stdout.printf("definesadd\n");
 		for (int i = 2; i <= api_minor; i += 2) {
 			defines.add ("VALA_0_%d".printf (i));
 		}
@@ -584,6 +587,7 @@ public class Vala.CodeContext {
 		target_glib_major = 2;
 		target_glib_minor = 56;
 
+		stdout.printf("definesadd\n");
 		for (int i = 16; i <= target_glib_minor; i += 2) {
 			defines.add ("GLIB_2_%d".printf (i));
 		}
@@ -674,17 +678,18 @@ public class Vala.CodeContext {
 	}
 
 	public string? get_vapi_path (string pkg) {
-		var path = get_file_path (pkg + ".vapi", "vala" + Config.PACKAGE_SUFFIX + "/vapi", "vala/vapi", vapi_directories);
+		// var path = get_file_path (pkg + ".vapi", "vala" + Config.PACKAGE_SUFFIX + "/vapi", "vala/vapi", vapi_directories);
 
-		if (path == null) {
-			/* last chance: try the package compiled-in vapi dir */
-			var filename = Path.build_path ("/", Config.PACKAGE_DATADIR, "vapi", pkg + ".vapi");
-			if (FileUtils.test (filename, FileTest.EXISTS)) {
-				path = filename;
-			}
-		}
+		//if (path == null) {
+		//	/* last chance: try the package compiled-in vapi dir */
+		//	var filename = Path.build_path ("/", Config.PACKAGE_DATADIR, "vapi", pkg + ".vapi");
+		//	if (FileUtils.test (filename, FileTest.EXISTS)) {
+		//		path = filename;
+		//	}
+		//}
 
-		return path;
+		//return path;
+		return null;
 	}
 
 	public string? get_gir_path (string gir) {
@@ -726,10 +731,10 @@ public class Vala.CodeContext {
 		}
 
 		// Search $GI_GIRDIR set by user or retrieved from gobject-introspection-1.0.pc
-		path = Path.build_path ("/", Config.GI_GIRDIR, girname);
-		if (FileUtils.test (path, FileTest.EXISTS | FileTest.IS_REGULAR)) {
-			return path;
-		}
+		//path = Path.build_path ("/", Config.GI_GIRDIR, girname);
+		//if (FileUtils.test (path, FileTest.EXISTS | FileTest.IS_REGULAR)) {
+		//	return path;
+		//}
 
 		// Search /usr/share
 		path = Path.build_path ("/", "/usr", "share", GIR_SUFFIX, girname);

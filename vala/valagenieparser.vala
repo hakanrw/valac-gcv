@@ -54,6 +54,7 @@ public class Vala.Genie.Parser : CodeVisitor {
 		public TokenType type;
 		public SourceLocation begin;
 		public SourceLocation end;
+		public Vala.Backend.Location location;
 	}
 
 	[Flags]
@@ -103,8 +104,9 @@ public class Vala.Genie.Parser : CodeVisitor {
 		size--;
 		if (size <= 0) {
 			SourceLocation begin, end;
-			TokenType type = scanner.read_token (out begin, out end);
-			tokens[index] = { type, begin, end };
+			Vala.Backend.Location location = 0;
+			TokenType type = scanner.read_token (out begin, out end /*, out location */); // FIXME: read location
+			tokens[index] = { type, begin, end, location };
 			size = 1;
 		}
 		return (tokens[index].type != TokenType.EOF);
@@ -215,12 +217,12 @@ public class Vala.Genie.Parser : CodeVisitor {
 	SourceReference get_src (SourceLocation begin) {
 		int last_index = (index + BUFFER_SIZE - 1) % BUFFER_SIZE;
 
-		return new SourceReference (scanner.source_file, begin, tokens[last_index].end);
+		return new SourceReference (scanner.source_file, begin, tokens[last_index].end, tokens[last_index].location);
 	}
 
 	SourceReference get_current_src () {
 		var token = tokens[index];
-		return new SourceReference (scanner.source_file, token.begin, token.end);
+		return new SourceReference (scanner.source_file, token.begin, token.end, token.location);
 	}
 
 	void rollback (SourceLocation location) {

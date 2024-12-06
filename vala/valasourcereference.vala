@@ -41,6 +41,11 @@ public class Vala.SourceReference {
 	 */
 	public SourceLocation end { get; set; }
 
+	/**
+	 * Location in backend format.
+	 */
+	public Vala.Backend.Location location { get; set; }
+
 	public List<UsingDirective> using_directives { get; private set; }
 
 	/**
@@ -51,11 +56,12 @@ public class Vala.SourceReference {
 	 * @param end          the end of the referenced source code
 	 * @return             newly created source reference
 	 */
-	public SourceReference (SourceFile _file, SourceLocation begin, SourceLocation end) {
+	public SourceReference (SourceFile _file, SourceLocation begin, SourceLocation end, Vala.Backend.Location location) {
 		file = _file;
 		this.begin = begin;
 		this.end = end;
 		using_directives = file.current_using_directives;
+		this.location = location;
 	}
 
 	/**

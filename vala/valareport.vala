@@ -397,6 +397,7 @@ public class Vala.Report {
 	}
 	[PrintfFormat]
 	public static void error (SourceReference? source, string msg_format, ...) {
+		if (source != null) Vala.Backend.error_at (source.location, msg_format.vprintf (va_list ()));
 		CodeContext.get ().report.err (source, msg_format.vprintf (va_list ()));
 	}
 }
