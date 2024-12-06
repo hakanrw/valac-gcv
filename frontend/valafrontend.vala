@@ -48,6 +48,9 @@ public class Vala.Frontend {
                         }
                 }
 
+		stdout.printf ("declare builtins\n");
+		Builtins.declare_defaults (context.root);
+
 		stdout.printf ("parser\n");
 		var parser = new Parser ();
 		parser.parse (context);

@@ -199,7 +199,7 @@ public class Vala.Namespace : Symbol {
 			st.access = SymbolAccessibility.INTERNAL;
 		}
 
-		if (st.owner == null) {
+		if (st.owner == null && st.source_reference != null) {
 			st.source_reference.file.add_node (st);
 		}
 
